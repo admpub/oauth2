@@ -1,26 +1,27 @@
 package generates
 
 import (
+	"context"
 	"encoding/base64"
 	"strings"
 	"time"
 
+	errs "errors"
+
 	"github.com/dgrijalva/jwt-go"
-	"gopkg.in/oauth2.v3"
-	"gopkg.in/oauth2.v3/errors"
-	"gopkg.in/oauth2.v3/utils/uuid"
+	"gopkg.in/oauth2.v4"
+	"gopkg.in/oauth2.v4/errors"
+	"gopkg.in/oauth2.v4/utils/uuid"
 )
 
 // JWTAccessClaims jwt claims
 type JWTAccessClaims struct {
-	ClientID  string `json:"client_id,omitempty"`
-	UserID    string `json:"user_id,omitempty"`
-	ExpiredAt int64  `json:"expired_at,omitempty"`
+	jwt.StandardClaims
 }
 
 // Valid claims verification
 func (a *JWTAccessClaims) Valid() error {
-	if time.Unix(a.ExpiredAt, 0).Before(time.Now()) {
+	if time.Unix(a.ExpiresAt, 0).Before(time.Now()) {
 		return errors.ErrInvalidAccessToken
 	}
 	return nil
@@ -41,23 +42,59 @@ type JWTAccessGenerate struct {
 }
 
 // Token based on the UUID generated token
-func (a *JWTAccessGenerate) Token(data *oauth2.GenerateBasic, isGenRefresh bool) (access, refresh string, err error) {
+func (a *JWTAccessGenerate) Token(ctx context.Context, data *oauth2.GenerateBasic, isGenRefresh bool) (string, string, error) {
 	claims := &JWTAccessClaims{
-		ClientID:  data.Client.GetID(),
-		UserID:    data.UserID,
-		ExpiredAt: data.TokenInfo.GetAccessCreateAt().Add(data.TokenInfo.GetAccessExpiresIn()).Unix(),
+		StandardClaims: jwt.StandardClaims{
+			Audience:  data.Client.GetID(),
+			Subject:   data.UserID,
+			ExpiresAt: data.TokenInfo.GetAccessCreateAt().Add(data.TokenInfo.GetAccessExpiresIn()).Unix(),
+		},
 	}
 
 	token := jwt.NewWithClaims(a.SignedMethod, claims)
-	access, err = token.SignedString(a.SignedKey)
-	if err != nil {
-		return
+	var key interface{}
+	if a.isEs() {
+		v, err := jwt.ParseECPrivateKeyFromPEM(a.SignedKey)
+		if err != nil {
+			return "", "", err
+		}
+		key = v
+	} else if a.isRsOrPS() {
+		v, err := jwt.ParseRSAPrivateKeyFromPEM(a.SignedKey)
+		if err != nil {
+			return "", "", err
+		}
+		key = v
+	} else if a.isHs() {
+		key = a.SignedKey
+	} else {
+		return "", "", errs.New("unsupported sign method")
 	}
+
+	access, err := token.SignedString(key)
+	if err != nil {
+		return "", "", err
+	}
+	refresh := ""
 
 	if isGenRefresh {
 		refresh = base64.URLEncoding.EncodeToString(uuid.NewSHA1(uuid.Must(uuid.NewRandom()), []byte(access)).Bytes())
 		refresh = strings.ToUpper(strings.TrimRight(refresh, "="))
 	}
 
-	return
+	return access, refresh, nil
+}
+
+func (a *JWTAccessGenerate) isEs() bool {
+	return strings.HasPrefix(a.SignedMethod.Alg(), "ES")
+}
+
+func (a *JWTAccessGenerate) isRsOrPS() bool {
+	isRs := strings.HasPrefix(a.SignedMethod.Alg(), "RS")
+	isPs := strings.HasPrefix(a.SignedMethod.Alg(), "PS")
+	return isRs || isPs
+}
+
+func (a *JWTAccessGenerate) isHs() bool {
+	return strings.HasPrefix(a.SignedMethod.Alg(), "HS")
 }

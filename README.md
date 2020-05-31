@@ -31,7 +31,7 @@
 ### Download and install
 
 ``` bash
-go get -u -v gopkg.in/oauth2.v3/...
+go get -u -v gopkg.in/oauth2.v4/...
 ```
 
 ### Create file `server.go`
@@ -43,11 +43,11 @@ import (
 	"log"
 	"net/http"
 
-	"gopkg.in/oauth2.v3/errors"
-	"gopkg.in/oauth2.v3/manage"
-	"gopkg.in/oauth2.v3/models"
-	"gopkg.in/oauth2.v3/server"
-	"gopkg.in/oauth2.v3/store"
+	"gopkg.in/oauth2.v4/errors"
+	"gopkg.in/oauth2.v4/manage"
+	"gopkg.in/oauth2.v4/models"
+	"gopkg.in/oauth2.v4/server"
+	"gopkg.in/oauth2.v4/store"
 )
 
 func main() {
@@ -134,13 +134,15 @@ Simulation examples of authorization code model, please check [example](/example
 
 ```go
 
-import "gopkg.in/oauth2.v3/generates"
-import "github.com/dgrijalva/jwt-go"
+import (
+	"gopkg.in/oauth2.v4/generates"
+	"github.com/dgrijalva/jwt-go"
+)
 
 // ...
 manager.MapAccessGenerate(generates.NewJWTAccessGenerate([]byte("00000000"), jwt.SigningMethodHS512))
 
-// Verify jwt access token
+// Parse and verify jwt access token
 token, err := jwt.ParseWithClaims(access, &generates.JWTAccessClaims{}, func(t *jwt.Token) (interface{}, error) {
 	if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 		return nil, fmt.Errorf("parse error")
@@ -148,12 +150,12 @@ token, err := jwt.ParseWithClaims(access, &generates.JWTAccessClaims{}, func(t *
 	return []byte("00000000"), nil
 })
 if err != nil {
-	panic(err)
+	// panic(err)
 }
 
 claims, ok := token.Claims.(*generates.JWTAccessClaims)
 if !ok || !token.Valid {
-	panic("invalid token")
+	// panic("invalid token")
 }
 ```
 
@@ -163,7 +165,12 @@ if !ok || !token.Valid {
 * [Redis](https://github.com/go-oauth2/redis)
 * [MongoDB](https://github.com/go-oauth2/mongo)
 * [MySQL](https://github.com/go-oauth2/mysql)
+* [MySQL (Provides both client and token store)](https://github.com/imrenagi/go-oauth2-mysql) 
+* [PostgreSQL](https://github.com/vgarvardt/go-oauth2-pg)
 * [DynamoDB](https://github.com/contamobi/go-oauth2-dynamodb)
+* [XORM](https://github.com/techknowlogick/go-oauth2-xorm)
+* [GORM](https://github.com/techknowlogick/go-oauth2-gorm)
+* [Firestore](https://github.com/tslamic/go-oauth2-firestore)
 
 ## MIT License
 
@@ -173,9 +180,9 @@ if !ok || !token.Valid {
 [Build-Status-Image]: https://travis-ci.org/go-oauth2/oauth2.svg?branch=master
 [codecov-url]: https://codecov.io/gh/go-oauth2/oauth2
 [codecov-image]: https://codecov.io/gh/go-oauth2/oauth2/branch/master/graph/badge.svg
-[reportcard-url]: https://goreportcard.com/report/gopkg.in/oauth2.v3
-[reportcard-image]: https://goreportcard.com/badge/gopkg.in/oauth2.v3
-[godoc-url]: https://godoc.org/gopkg.in/oauth2.v3
-[godoc-image]: https://godoc.org/gopkg.in/oauth2.v3?status.svg
+[reportcard-url]: https://goreportcard.com/report/gopkg.in/oauth2.v4
+[reportcard-image]: https://goreportcard.com/badge/gopkg.in/oauth2.v4
+[godoc-url]: https://godoc.org/gopkg.in/oauth2.v4
+[godoc-image]: https://godoc.org/gopkg.in/oauth2.v4?status.svg
 [license-url]: http://opensource.org/licenses/MIT
 [license-image]: https://img.shields.io/npm/l/express.svg
