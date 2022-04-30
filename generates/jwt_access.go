@@ -6,12 +6,10 @@ import (
 	"strings"
 	"time"
 
-	errs "errors"
-
-	"github.com/dgrijalva/jwt-go"
-	"gopkg.in/oauth2.v4"
-	"gopkg.in/oauth2.v4/errors"
-	"gopkg.in/oauth2.v4/utils/uuid"
+	"github.com/go-oauth2/oauth2/v4"
+	"github.com/go-oauth2/oauth2/v4/errors"
+	"github.com/golang-jwt/jwt"
+	"github.com/google/uuid"
 )
 
 // JWTAccessClaims jwt claims
@@ -28,8 +26,9 @@ func (a *JWTAccessClaims) Valid() error {
 }
 
 // NewJWTAccessGenerate create to generate the jwt access token instance
-func NewJWTAccessGenerate(key []byte, method jwt.SigningMethod) *JWTAccessGenerate {
+func NewJWTAccessGenerate(kid string, key []byte, method jwt.SigningMethod) *JWTAccessGenerate {
 	return &JWTAccessGenerate{
+		SignedKeyID:  kid,
 		SignedKey:    key,
 		SignedMethod: method,
 	}
@@ -37,6 +36,7 @@ func NewJWTAccessGenerate(key []byte, method jwt.SigningMethod) *JWTAccessGenera
 
 // JWTAccessGenerate generate the jwt access token
 type JWTAccessGenerate struct {
+	SignedKeyID  string
 	SignedKey    []byte
 	SignedMethod jwt.SigningMethod
 }
@@ -52,6 +52,9 @@ func (a *JWTAccessGenerate) Token(ctx context.Context, data *oauth2.GenerateBasi
 	}
 
 	token := jwt.NewWithClaims(a.SignedMethod, claims)
+	if a.SignedKeyID != "" {
+		token.Header["kid"] = a.SignedKeyID
+	}
 	var key interface{}
 	if a.isEs() {
 		v, err := jwt.ParseECPrivateKeyFromPEM(a.SignedKey)
@@ -68,7 +71,7 @@ func (a *JWTAccessGenerate) Token(ctx context.Context, data *oauth2.GenerateBasi
 	} else if a.isHs() {
 		key = a.SignedKey
 	} else {
-		return "", "", errs.New("unsupported sign method")
+		return "", "", errors.New("unsupported sign method")
 	}
 
 	access, err := token.SignedString(key)
@@ -78,7 +81,8 @@ func (a *JWTAccessGenerate) Token(ctx context.Context, data *oauth2.GenerateBasi
 	refresh := ""
 
 	if isGenRefresh {
-		refresh = base64.URLEncoding.EncodeToString(uuid.NewSHA1(uuid.Must(uuid.NewRandom()), []byte(access)).Bytes())
+		t := uuid.NewSHA1(uuid.Must(uuid.NewRandom()), []byte(access)).String()
+		refresh = base64.URLEncoding.EncodeToString([]byte(t))
 		refresh = strings.ToUpper(strings.TrimRight(refresh, "="))
 	}
 

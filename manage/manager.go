@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"gopkg.in/oauth2.v4"
-	"gopkg.in/oauth2.v4/errors"
-	"gopkg.in/oauth2.v4/generates"
-	"gopkg.in/oauth2.v4/models"
+	"github.com/go-oauth2/oauth2/v4"
+	"github.com/go-oauth2/oauth2/v4/errors"
+	"github.com/go-oauth2/oauth2/v4/generates"
+	"github.com/go-oauth2/oauth2/v4/models"
 )
 
 // NewDefaultManager create to default authorization management instance
@@ -176,6 +176,10 @@ func (m *Manager) GenerateAuthToken(ctx context.Context, rt oauth2.ResponseType,
 		if exp := tgr.AccessTokenExp; exp > 0 {
 			ti.SetAccessExpiresIn(exp)
 		}
+		if tgr.CodeChallenge != "" {
+			ti.SetCodeChallenge(tgr.CodeChallenge)
+			ti.SetCodeChallengeMethod(tgr.CodeChallengeMethod)
+		}
 
 		tv, err := m.authorizeGenerate.Token(ctx, td)
 		if err != nil {
@@ -214,7 +218,7 @@ func (m *Manager) GenerateAuthToken(ctx context.Context, rt oauth2.ResponseType,
 	}
 	return ti, nil
 }
-
+ 
 // get authorization code data
 func (m *Manager) getAuthorizationCode(ctx context.Context, code string) (oauth2.TokenInfo, error) {
 	ti, err := m.tokenStore.GetByCode(ctx, code)
@@ -251,14 +255,42 @@ func (m *Manager) getAndDelAuthorizationCode(ctx context.Context, tgr *oauth2.To
 	return ti, nil
 }
 
+func (m *Manager) validateCodeChallenge(ti oauth2.TokenInfo, ver string) error {
+	cc := ti.GetCodeChallenge()
+	// early return
+	if cc == "" && ver == "" {
+		return nil
+	}
+	if cc == "" {
+		return errors.ErrMissingCodeVerifier
+	}
+	if ver == "" {
+		return errors.ErrMissingCodeVerifier
+	}
+	ccm := ti.GetCodeChallengeMethod()
+	if ccm.String() == "" {
+		ccm = oauth2.CodeChallengePlain
+	}
+	if !ccm.Validate(cc, ver) {
+		return errors.ErrInvalidCodeChallenge
+	}
+	return nil
+}
+
 // GenerateAccessToken generate the access token
 func (m *Manager) GenerateAccessToken(ctx context.Context, gt oauth2.GrantType, tgr *oauth2.TokenGenerateRequest) (oauth2.TokenInfo, error) {
 	cli, err := m.GetClient(ctx, tgr.ClientID)
 	if err != nil {
 		return nil, err
-	} else if tgr.ClientSecret != cli.GetSecret() {
+	}
+	if cliPass, ok := cli.(oauth2.ClientPasswordVerifier); ok {
+		if !cliPass.VerifyPassword(tgr.ClientSecret) {
+			return nil, errors.ErrInvalidClient
+		}
+	} else if len(cli.GetSecret()) > 0 && tgr.ClientSecret != cli.GetSecret() {
 		return nil, errors.ErrInvalidClient
-	} else if tgr.RedirectURI != "" {
+	}
+	if tgr.RedirectURI != "" {
 		if err := m.validateURI(cli.GetDomain(), tgr.RedirectURI); err != nil {
 			return nil, err
 		}
@@ -267,6 +299,9 @@ func (m *Manager) GenerateAccessToken(ctx context.Context, gt oauth2.GrantType, 
 	if gt == oauth2.AuthorizationCode {
 		ti, err := m.getAndDelAuthorizationCode(ctx, tgr)
 		if err != nil {
+			return nil, err
+		}
+		if err := m.validateCodeChallenge(ti, tgr.CodeVerifier); err != nil {
 			return nil, err
 		}
 		tgr.UserID = ti.GetUserID()
@@ -325,18 +360,14 @@ func (m *Manager) GenerateAccessToken(ctx context.Context, gt oauth2.GrantType, 
 
 // RefreshAccessToken refreshing an access token
 func (m *Manager) RefreshAccessToken(ctx context.Context, tgr *oauth2.TokenGenerateRequest) (oauth2.TokenInfo, error) {
-	cli, err := m.GetClient(ctx, tgr.ClientID)
-	if err != nil {
-		return nil, err
-	} else if tgr.ClientSecret != cli.GetSecret() {
-		return nil, errors.ErrInvalidClient
-	}
-
 	ti, err := m.LoadRefreshToken(ctx, tgr.Refresh)
 	if err != nil {
 		return nil, err
-	} else if ti.GetClientID() != tgr.ClientID {
-		return nil, errors.ErrInvalidRefreshToken
+	}
+
+	cli, err := m.GetClient(ctx, ti.GetClientID())
+	if err != nil {
+		return nil, err
 	}
 
 	oldAccess, oldRefresh := ti.GetAccess(), ti.GetRefresh()

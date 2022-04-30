@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"gopkg.in/oauth2.v4"
-	"gopkg.in/oauth2.v4/manage"
-	"gopkg.in/oauth2.v4/models"
-	"gopkg.in/oauth2.v4/store"
+	"github.com/go-oauth2/oauth2/v4"
+	"github.com/go-oauth2/oauth2/v4/manage"
+	"github.com/go-oauth2/oauth2/v4/models"
+	"github.com/go-oauth2/oauth2/v4/store"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
@@ -93,9 +93,11 @@ func testManager(tgr *oauth2.TokenGenerateRequest, manager oauth2.Manager) {
 	So(err, ShouldBeNil)
 	So(rinfo.GetClientID(), ShouldEqual, atParams.ClientID)
 
-	atParams.Refresh = refreshToken
-	atParams.Scope = "owner"
-	rti, err := manager.RefreshAccessToken(ctx, atParams)
+	refreshParams := &oauth2.TokenGenerateRequest{
+		Refresh: refreshToken,
+		Scope:   "owner",
+	}
+	rti, err := manager.RefreshAccessToken(ctx, refreshParams)
 	So(err, ShouldBeNil)
 
 	refreshAT := rti.GetAccess()
