@@ -9,7 +9,6 @@ require (
 	github.com/gavv/httpexpect v2.0.0+incompatible
 	github.com/go-session/session v3.1.2+incompatible
 	github.com/golang-jwt/jwt v3.2.2+incompatible
-	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/go-querystring v1.0.0 // indirect
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/websocket v1.4.2 // indirect

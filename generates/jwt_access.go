@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/admpub/oauth2/v4"
-	"github.com/admpub/oauth2/v4/errors"
+	"github.com/go-oauth2/oauth2/v4"
+	"github.com/go-oauth2/oauth2/v4/errors"
 	"github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
 )
@@ -70,6 +70,12 @@ func (a *JWTAccessGenerate) Token(ctx context.Context, data *oauth2.GenerateBasi
 		key = v
 	} else if a.isHs() {
 		key = a.SignedKey
+	} else if a.isEd() {
+		v, err := jwt.ParseEdPrivateKeyFromPEM(a.SignedKey)
+		if err != nil {
+			return "", "", err
+		}
+		key = v
 	} else {
 		return "", "", errors.New("unsupported sign method")
 	}
@@ -101,4 +107,8 @@ func (a *JWTAccessGenerate) isRsOrPS() bool {
 
 func (a *JWTAccessGenerate) isHs() bool {
 	return strings.HasPrefix(a.SignedMethod.Alg(), "HS")
+}
+
+func (a *JWTAccessGenerate) isEd() bool {
+	return strings.HasPrefix(a.SignedMethod.Alg(), "Ed")
 }

@@ -296,6 +296,10 @@ func (m *Manager) GenerateAccessToken(ctx context.Context, gt oauth2.GrantType, 
 		}
 	}
 
+	if gt == oauth2.ClientCredentials && cli.IsPublic() == true {
+		return nil, errors.ErrInvalidClient
+	}
+
 	if gt == oauth2.AuthorizationCode {
 		ti, err := m.getAndDelAuthorizationCode(ctx, tgr)
 		if err != nil {
