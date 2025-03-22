@@ -9,7 +9,7 @@ import (
 	"github.com/admpub/oauth2/v4"
 	"github.com/admpub/oauth2/v4/generates"
 	"github.com/admpub/oauth2/v4/models"
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v5"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
@@ -45,7 +45,8 @@ func TestJWTAccess(t *testing.T) {
 		claims, ok := token.Claims.(*generates.JWTAccessClaims)
 		So(ok, ShouldBeTrue)
 		So(token.Valid, ShouldBeTrue)
-		So(claims.Audience, ShouldEqual, "123456")
+		claims.GetAudience()
+		So(claims.Audience[0], ShouldEqual, "123456")
 		So(claims.Subject, ShouldEqual, "000000")
 	})
 }
